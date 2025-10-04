@@ -10,6 +10,7 @@ import {
   HttpStatus,
   UseInterceptors,
   UploadedFile,
+  Query,
 } from '@nestjs/common';
 import { CourseService } from './course.service';
 import { CreateCourseDto } from './dto/create-course.dto';
@@ -30,8 +31,19 @@ export class CourseController {
   }
 
   @Get()
-  async findAll(): Promise<Course[]> {
-    return this.courseService.findAll();
+  async findAll(
+    @Query('search') search?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    // Parse limit and offset to numbers with defaults
+    const limitValue = limit ? parseInt(limit, 10) : 10;
+    const offsetValue = offset ? parseInt(offset, 10) : 0;
+    return this.courseService.findAll({
+      search: search || '',
+      limit: limitValue,
+      offset: offsetValue,
+    });
   }
 
   @Get(':courseId')

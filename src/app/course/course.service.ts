@@ -30,9 +30,38 @@ export class CourseService {
     return createdCourse.save();
   }
 
-  // Finds all courses
-  async findAll(): Promise<Course[]> {
-    return this.courseModel.find().exec();
+  // Finds all courses with pagination, offset, and search by title using aggregation and returns pagination info
+  async findAll({ search = '', limit = 10, offset = 0 }: { search?: string; limit?: number; offset?: number }) {
+    const filter: any = {};
+    if (search) {
+      filter.title = { $regex: search, $options: 'i' };
+    }
+
+    // Get paginated courses
+    const courses = await this.courseModel
+      .find(filter)
+      .skip(offset)
+      .limit(limit)
+      .exec();
+
+    // Get total count
+    const totalCourses = await this.courseModel.countDocuments(filter);
+
+    const currentPage = limit > 0 ? Math.floor(offset / limit) + 1 : 0;
+    const totalPages = limit > 0 ? Math.ceil(totalCourses / limit) : 0;
+    const nextPage = currentPage < totalPages ? currentPage + 1 : 0;
+
+    return {
+      courses,
+      pagination: {
+        offset,
+        limit,
+        currentPage,
+        totalPages,
+        nextPage,
+        totalCourses,
+      },
+    };
   }
 
   // Finds a single course by its ID, with error handling

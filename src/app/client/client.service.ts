@@ -34,48 +34,67 @@ export class ClientService {
     limit?: number,
     offset?: number,
     sort?: string,
-  ): Promise<Client[]> {
-    // بناء كائن البحث
-    const filter: any = {};
-
+  ) {
+    // Build aggregation pipeline
+    const pipeline: any[] = [];
+    const match: any = {};
     if (phone) {
-      filter.phone = { $regex: phone, $options: 'i' }; // بحث جزئي غير حساس لحالة الأحرف
+      match.phone = { $regex: phone, $options: 'i' };
     }
-
     if (name) {
-      filter.name = { $regex: name, $options: 'i' }; // بحث جزئي غير حساس لحالة الأحرف
+      match.name = { $regex: name, $options: 'i' };
+    }
+    if (Object.keys(match).length > 0) {
+      pipeline.push({ $match: match });
     }
 
-    // بناء الاستعلام
-    let query = this.clientModel.find(filter);
-
-    // التصنيف (Sort)
+    // Sorting
     if (sort) {
       const sortObject: any = {};
       const sortFields = sort.split(',');
-
       sortFields.forEach((field) => {
         if (field.startsWith('-')) {
-          sortObject[field.substring(1)] = -1; // تنازلي
+          sortObject[field.substring(1)] = -1;
         } else {
-          sortObject[field] = 1; // تصاعدي
+          sortObject[field] = 1;
         }
       });
-
-      query = query.sort(sortObject);
+      pipeline.push({ $sort: sortObject });
     }
 
-    // التخطي (Offset)
-    if (offset) {
-      query = query.skip(offset);
-    }
+    // Pagination
+    const limitValue = limit ?? 10;
+    const offsetValue = offset ?? 0;
+    pipeline.push({ $skip: offsetValue });
+    pipeline.push({ $limit: limitValue });
 
-    // الحد الأقصى (Limit)
-    if (limit) {
-      query = query.limit(limit);
-    }
+    // Get paginated clients
+    const clients = await this.clientModel.aggregate(pipeline).exec();
 
-    return query.exec();
+    // Get total count (with same filter)
+    const countPipeline: any[] = [];
+    if (Object.keys(match).length > 0) {
+      countPipeline.push({ $match: match });
+    }
+    countPipeline.push({ $count: 'total' });
+    const countResult = await this.clientModel.aggregate(countPipeline).exec();
+    const totalClients = countResult[0]?.total || 0;
+
+    const currentPage = limitValue > 0 ? Math.floor(offsetValue / limitValue) + 1 : 0;
+    const totalPages = limitValue > 0 ? Math.ceil(totalClients / limitValue) : 0;
+    const nextPage = currentPage < totalPages ? currentPage + 1 : 0;
+
+    return {
+      clients,
+      pagination: {
+        offset: offsetValue,
+        limit: limitValue,
+        currentPage,
+        totalPages,
+        nextPage,
+        totalClients,
+      },
+    };
   }
 
   // 3. الحصول على عميل حسب الـ ID

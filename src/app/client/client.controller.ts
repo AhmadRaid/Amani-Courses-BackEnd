@@ -17,11 +17,14 @@ export class ClientController {
 async findAll(
   @Query('phone') phone?: string,
   @Query('name') name?: string,
-  @Query('limit') limit?: number,
-  @Query('offset') offset?: number,
+  @Query('limit') limit?: string,
+  @Query('offset') offset?: string,
   @Query('sort') sort?: string
-): Promise<Client[]> {
-  return this.clientService.findAll(phone, name, limit, offset, sort);
+) {
+  // Parse limit and offset to numbers with defaults
+  const limitValue = limit ? parseInt(limit, 10) : 10;
+  const offsetValue = offset ? parseInt(offset, 10) : 0;
+  return this.clientService.findAll(phone, name, limitValue, offsetValue, sort);
 }
 
   @Get(':id')
